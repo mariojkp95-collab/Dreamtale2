@@ -1,4 +1,3 @@
-
 :root{
   --bg:#0f172a; --card:#0b1224; --border:#1f2a44; --text:#e5e7eb; --muted:#a1a1aa;
   --hp:#ef4444; --mp:#3b82f6; --xp1:#22c55e; --xp2:#7c3aed;
@@ -43,7 +42,7 @@ main{padding-top:86px; padding-bottom:76px}
 .quickbar{display:flex;gap:6px}
 .slot{background:#151c33;color:#cbd5e1;border:1px solid var(--border);border-radius:8px;padding:6px 12px;cursor:pointer}
 
-/* Sidebar destra + pannelli collassabili */
+/* Sidebar destra */
 #sidebar{position:fixed;top:8px;right:8px;width:240px;display:flex;flex-direction:column;gap:10px;z-index:10}
 .side-panel{background:rgba(11,18,36,.8);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .side-head{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);font-size:14px}
