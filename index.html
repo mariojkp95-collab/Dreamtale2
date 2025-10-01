@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dreamtale Isometric (Prototype)</title>
-  <link rel="stylesheet" href="style.css?v=iso2" />
+  <link rel="stylesheet" href="style.css?v=iso2.2" />
 </head>
 <body>
 
@@ -14,8 +14,9 @@
       <h1 class="logo">Dreamtale (Isometric)</h1>
       <p class="subtitle">Tap-to-move • Isometrico • Fireball AoE</p>
       <div class="menu">
-        <button id="btnStart" class="btn primary">▶ Inizia</button>
-        <button id="btnReset" class="btn danger">🗑 Reset Salvataggio</button>
+        <!-- NB: onclick garantisce il funzionamento anche senza listener -->
+        <button class="btn primary" onclick="startGame()">▶ Inizia</button>
+        <button class="btn danger" onclick="resetSave()">🗑 Reset Salvataggio</button>
       </div>
       <div class="options">
         <label><input type="checkbox" id="optPathHighlight"> Evidenzia percorso (debug)</label>
@@ -45,7 +46,6 @@
 
   <!-- Sidebar destra -->
   <aside id="sidebar">
-    <!-- Minimap panel -->
     <div id="minimapBox" class="side-panel">
       <div class="side-head">
         <span>Minimappa</span>
@@ -54,7 +54,6 @@
       <canvas id="minimap" width="160" height="160" aria-label="Minimappa"></canvas>
     </div>
 
-    <!-- Quest panel -->
     <div id="questPanel" class="side-panel">
       <div class="side-head">
         <span>Quest</span>
@@ -101,11 +100,11 @@
       <p class="subtitle">Hai perso il 10% delle monete. Vuoi respawnare?</p>
       <div class="menu">
         <button id="btnRespawn" class="btn primary">↻ Respawn</button>
-        <button id="btnMenu" class="btn">☰ Torna al Menu</button>
+        <button id="btnMenu" class="btn" onclick="backToMenu()">☰ Torna al Menu</button>
       </div>
     </div>
   </div>
 
-  <script src="game.js?v=iso2"></script>
+  <script src="game.js?v=iso2.2"></script>
 </body>
 </html>
