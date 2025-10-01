@@ -1,4 +1,3 @@
-
 // ====== Config base (isometric) ======
 const mapCols=10, mapRows=10;
 const isoTileW=128, isoTileH=64;   // rapporto 2:1
@@ -22,9 +21,8 @@ const btnHideMinimap=$('btnHideMinimap'), btnHideQuest=$('btnHideQuest');
 const btnToggleMinimap=$('btnToggleMinimap'), btnToggleQuest=$('btnToggleQuest');
 const btnQuestReset=$('btnQuestReset');
 
-// Title & death
-const titleScreen=$('titleScreen'), deathScreen=$('deathScreen');
-const btnStart=$('btnStart'), btnReset=$('btnReset'), btnMenu=$('btnMenu'), btnRespawn=$('btnRespawn');
+// Death
+const deathScreen=$('deathScreen');
 
 // Skill bar
 const skill1=$('skill1'), skill1cd=$('skill1cd');
@@ -45,7 +43,7 @@ const ENEMY_ATK_MIN=3, ENEMY_ATK_MAX=6, ENEMY_ATK_CD_MS=900;
 const DROP_COIN_CHANCE=.35, DROP_POTION_CHANCE=.10;
 
 // Fireball skill
-const FB_MP_COST=10, FB_COOLDOWN_MS=2000, FB_SPEED=10; // px per frame
+const FB_MP_COST=10, FB_COOLDOWN_MS=2000, FB_SPEED=10;
 let fbReadyTs=0;
 let projectiles=[];
 
@@ -55,10 +53,28 @@ $('qtarget').textContent=QUEST_TARGET; $('qmax').textContent=QUEST_TARGET; $('qr
 const qfill=$('qfill'), qcount=$('qcount');
 
 // Save keys
-const SAVE_KEY='dreamtale_iso_save_v2';
-const UI_KEY='dreamtale_iso_ui_v2';
+const SAVE_KEY='dreamtale_iso_save_v2_2';
+const UI_KEY='dreamtale_iso_ui_v2_2';
 
-// ===== Assets (tolleranti) =====
+// ====== GLOBAL HANDLERS (menu) ======
+window.startGame = function(){
+  const t = document.getElementById('titleScreen');
+  if (t) { t.classList.remove('show'); t.style.display = 'none'; }
+};
+window.resetSave = function(){
+  try{
+    localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(UI_KEY);
+  }catch{}
+  location.reload();
+};
+window.backToMenu = function(){
+  try{ deathScreen.classList.remove('show'); }catch{}
+  const t = document.getElementById('titleScreen');
+  if (t) { t.classList.add('show'); t.style.display = 'grid'; }
+};
+
+// ===== Assets =====
 const IMGS={}, SRC={
   tile:'assets/tile_ground.png',
   tree:'assets/tree.png',
@@ -82,7 +98,7 @@ async function loadAll(){
 }
 
 // ===== Map & math (isometric) =====
-let map=[], objects=[];
+let map=[];
 function rngSeed(seed){ let s=seed>>>0; return ()=>{ s = (s*1664525 + 1013904223)>>>0; return s/2**32; }; }
 let rnd=rngSeed(1337);
 
@@ -94,12 +110,10 @@ function genMap(){
   }
 }
 
-// world offset to center
 const worldOffsetX = screenW/2;
 const worldOffsetY = 180;
 
 function isoToScreen(ix,iy){
-  // tile center
   const sx = (ix - iy)*(isoTileW/2) + worldOffsetX;
   const sy = (ix + iy)*(isoTileH/2) + worldOffsetY;
   return {x:sx, y:sy};
@@ -113,11 +127,11 @@ function screenToIso(sx,sy){
 function isWalkableTile(x,y){ return x>=0 && y>=0 && x<mapCols && y<mapRows && map[y][x]===0; }
 function isEnemyAt(x,y){ return enemies.some(e=>e.x===x && e.y===y); }
 function isWalkableDynamic(x,y){ return isWalkableTile(x,y) && !isEnemyAt(x,y); }
+function manhattan(ax,ay,bx,by){ return Math.abs(ax-bx)+Math.abs(ay-by); }
 
 // ===== Entities =====
 const player={x:2,y:2,hp:100,maxHp:100,mp:100,maxMp:100,coins:0,potions:0,lvl:1,exp:0};
 let enemies=[], coins=[], potions=[], walking=false, pathQueue=[];
-
 function randEmpty(exclude=[]){
   let tries=0;
   while(tries<500){
@@ -219,7 +233,7 @@ function handleTap(evt){
   if(deathScreen.classList.contains('show')) return;
   const {tx,ty, sx, sy} = canvasToTile(evt);
   lastClick={sx,sy};
-  const enemy = enemies.find(e=>e.x===tx&&e.y===ty && Math.abs(e.x-player.x)+Math.abs(e.y-player.y)===1);
+  const enemy = enemies.find(e=>e.x===tx&&e.y===ty && manhattan(e.x,e.y,player.x,player.y)===1);
   if(enemy){ // melee
     const now=performance.now(); if(now-lastAttackTs>=ATTACK_CD_MS){
       lastAttackTs=now; enemy.hp=Math.max(0, enemy.hp - (PLAYER_ATK_MIN + Math.floor(Math.random()*(PLAYER_ATK_MAX-PLAYER_ATK_MIN+1))));
@@ -232,7 +246,7 @@ function handleTap(evt){
   if(path && path.length){ pathQueue=path; walking=true; }
 }
 
-// ===== Enemy utils =====
+// ===== Enemy utils/AI =====
 function onEnemyDeath(enemy){
   if(Math.random()<DROP_COIN_CHANCE) coins.push({x:enemy.x,y:enemy.y});
   else if(Math.random()<DROP_POTION_CHANCE) potions.push({x:enemy.x,y:enemy.y});
@@ -242,9 +256,8 @@ function onEnemyDeath(enemy){
   enemy.maxHp=25+Math.floor(player.lvl*1.3); enemy.hp=enemy.maxHp;
   enemy.ai='idle'; enemy.aggroUntil=0; enemy.path=[]; enemy.nextRepath=0;
 }
-
 function enemyAdjAttack(e, ts){
-  const dist = Math.abs(e.x-player.x)+Math.abs(e.y-player.y);
+  const dist = manhattan(e.x,e.y,player.x,player.y);
   if(dist===1 && (ts - (e.lastAtk||0))>=ENEMY_ATK_CD_MS){
     e.lastAtk=ts;
     const dmg = Math.floor(ENEMY_ATK_MIN + Math.random()*(ENEMY_ATK_MAX-ENEMY_ATK_MIN+1));
@@ -252,10 +265,9 @@ function enemyAdjAttack(e, ts){
     if(player.hp<=0) onDeath();
   }
 }
-
 function enemyAI(ts){
   enemies.forEach(e=>{
-    const dist = Math.abs(e.x-player.x)+Math.abs(e.y-player.y);
+    const dist = manhattan(e.x,e.y,player.x,player.y);
     if(dist<=AGGRO_RANGE){ e.ai='aggro'; e.aggroUntil=ts+AGGRO_MEMORY_MS; }
     else if(e.ai==='aggro' && ts>e.aggroUntil){ e.ai='idle'; e.path=[]; }
 
@@ -288,14 +300,12 @@ function enemyAI(ts){
   });
 }
 
-// ===== Fireball skill (AoE) =====
-const FB_COOLDOWN_MS=2000, FB_MP_COST=10, FB_SPEED=10;
-let fbReadyTs=0;
-let projectiles=[];
+// ===== Fireball AoE =====
+let lastClick=null;
 function tryCastFireball(targetSx, targetSy){
   const now=performance.now();
-  if(now < fbReadyTs) return;             // cooldown
-  if(player.mp < FB_MP_COST) return;      // mana
+  if(now < fbReadyTs) return;
+  if(player.mp < FB_MP_COST) return;
   const pScreen = isoToScreen(player.x, player.y);
   const dx = targetSx - pScreen.x;
   const dy = (targetSy - 40) - (pScreen.y - 32);
@@ -314,7 +324,7 @@ function updateProjectiles(){
       const iso=screenToIso(p.x, p.y);
       const tx=Math.round(iso.x), ty=Math.round(iso.y);
       enemies.forEach(e=>{
-        const d = Math.max(Math.abs(e.x-tx), Math.abs(e.y-ty)); // raggio 1
+        const d = Math.max(Math.abs(e.x-tx), Math.abs(e.y-ty)); // raggio 1 (8 caselle)
         if(d<=1){
           e.hp = Math.max(0, e.hp - (10 + Math.floor(Math.random()*8)));
           if(e.hp===0) onEnemyDeath(e);
@@ -325,7 +335,6 @@ function updateProjectiles(){
       projectiles.splice(i,1);
     }
   }
-  // cooldown UI
   const now=performance.now();
   const remain = Math.max(0, fbReadyTs - now);
   const pct = remain/FB_COOLDOWN_MS;
@@ -335,7 +344,7 @@ function updateProjectiles(){
 // ===== Rendering (isometric) =====
 function draw(){
   ctx.clearRect(0,0,screenW,screenH);
-  // draw ground tiles
+  // ground
   for(let y=0;y<mapRows;y++){
     for(let x=0;x<mapCols;x++){
       const s=isoToScreen(x,y);
@@ -347,33 +356,22 @@ function draw(){
     pathQueue.forEach(p=>{ const s=isoToScreen(p.x,p.y); ctx.beginPath(); ctx.moveTo(s.x, s.y-isoTileH/2); ctx.lineTo(s.x+isoTileW/2, s.y); ctx.lineTo(s.x, s.y+isoTileH/2); ctx.lineTo(s.x-isoTileW/2, s.y); ctx.closePath(); ctx.fill(); });
     ctx.restore();
   }
-  // collect drawables with z-order = x+y
+  // drawables con z-order
   const drawables=[];
-  // coins/potions
   coins.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.coin, s.x-24, s.y-32, 48,48)}); });
   potions.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.potion, s.x-24, s.y-48, 48,64)}); });
-  // trees (blocked tiles)
   for(let y=0;y<mapRows;y++) for(let x=0;x<mapCols;x++) if(map[y][x]===1){
     const s=isoToScreen(x,y); drawables.push({z:x+y+0.5, fn:()=>ctx.drawImage(IMGS.tree, s.x-64, s.y-140, 128,160)});
   }
-  // enemies
-  enemies.forEach(e=>{
-    const s=isoToScreen(e.x,e.y);
-    drawables.push({z:e.x+e.y+0.25, fn:()=>ctx.drawImage(IMGS.enemy, s.x-48, s.y-96, 96,128)});
-  });
-  // player
+  enemies.forEach(e=>{ const s=isoToScreen(e.x,e.y); drawables.push({z:e.x+e.y+0.25, fn:()=>ctx.drawImage(IMGS.enemy, s.x-48, s.y-96, 96,128)}); });
   { const s=isoToScreen(player.x,player.y); drawables.push({z:player.x+player.y+0.25, fn:()=>ctx.drawImage(IMGS.player, s.x-48, s.y-96, 96,128)}); }
-  // sort by z
   drawables.sort((a,b)=>a.z-b.z);
   drawables.forEach(d=>d.fn());
-
-  // projectiles on top
-  projectiles.forEach(p=>{
-    if(p.type==='fireball'){ ctx.drawImage(IMGS.fireball, p.x-24, p.y-24, 48,48); }
-  });
-
+  // projectiles sopra
+  projectiles.forEach(p=>{ if(p.type==='fireball'){ ctx.drawImage(IMGS.fireball, p.x-24, p.y-24, 48,48); }});
+  // minimappa + debug
   drawMinimap();
-  if(dbg) dbg.textContent = `ISO ok | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
+  if(dbg) dbg.textContent = `ISO v2.2 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
 }
 
 function drawMinimap(){
@@ -395,7 +393,6 @@ function drawMinimap(){
 // ===== Timers =====
 setInterval(()=>{
   const ts=performance.now();
-  // walking
   if(walking && pathQueue.length){
     const peek=pathQueue[0];
     if(!isWalkableDynamic(peek.x,peek.y)){
@@ -433,25 +430,20 @@ btnToggleMinimap.addEventListener('click', ()=>{ minimapBox.classList.toggle('co
 btnToggleQuest  .addEventListener('click', ()=>{ questPanel.classList.toggle('collapsed'); saveUI(); });
 btnQuestReset.addEventListener('click', ()=>{ questCount=0; questDone=false; updateHUD(); saveGame(); });
 
-btnStart.addEventListener('click', ()=>{ titleScreen.classList.remove('show'); titleScreen.style.display='none'; });
-btnReset.addEventListener('click', ()=>{ localStorage.removeItem(SAVE_KEY); localStorage.removeItem(UI_KEY); location.reload(); });
-btnMenu.addEventListener('click', ()=>{ deathScreen.classList.remove('show'); titleScreen.classList.add('show'); });
-btnRespawn.addEventListener('click', respawn);
-
 // Skill input
-let lastClick=null;
-skill1.addEventListener('click', (e)=>{
+skill1.addEventListener('click', ()=>{
   lastClick = lastClick || {sx:screenW/2, sy:screenH/2};
   tryCastFireball(lastClick.sx, lastClick.sy);
 });
 window.addEventListener('keydown', (e)=>{
-  if(e.key==='1'){ 
+  if(e.key==='1'){
     lastClick = lastClick || {sx:screenW/2, sy:screenH/2};
     tryCastFireball(lastClick.sx, lastClick.sy);
   }
 });
 
 // Click-to-move & aim
+let lastClick=null;
 c.addEventListener('pointerdown', (e)=>{
   const rect=c.getBoundingClientRect();
   const sx=(e.clientX-rect.left)*(c.width/rect.width), sy=(e.clientY-rect.top)*(c.height/rect.height);
