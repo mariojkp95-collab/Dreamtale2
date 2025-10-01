@@ -4,13 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dreamtale Isometric (Prototype)</title>
-  <link rel="stylesheet" href="style.css?v=iso2.3" />
+  <link rel="stylesheet" href="style.css?v=iso2.4" />
 </head>
 <body>
 
-  <!-- Fallback: funzioni globali per i bottoni, definite PRIMA di caricare game.js -->
+  <!-- Fallback + banner di stato -->
   <script>
-    // banner di boot (se game.js non parte, almeno vediamo questo)
     (function(){
       var b=document.createElement('div');
       b.id='bootBanner';
@@ -20,21 +19,30 @@
       window.__BOOT_BANNER__=b;
     })();
 
-    // Fallback handler: vengono sovrascritti da game.js se carica
+    // Fallback UI handlers (sovrascritti da game.js se parte)
     window.startGame = function(){
       var t=document.getElementById('titleScreen');
       if(t){ t.classList.remove('show'); t.style.display='none'; }
-      if(window.__BOOT_BANNER__){ __BOOT_BANNER__.textContent='boot: startGame() fallback eseguito'; }
+      if(window.__BOOT_BANNER__){ __BOOT_BANNER__.textContent='startGame() fallback eseguito'; }
     };
-    window.resetSave = function(){
-      try{ localStorage.clear(); }catch(e){}
-      location.reload();
-    };
+    window.resetSave = function(){ try{ localStorage.clear(); }catch(e){} location.reload(); };
     window.backToMenu = function(){
-      var d=document.getElementById('deathScreen');
-      if(d) d.classList.remove('show');
-      var t=document.getElementById('titleScreen');
-      if(t){ t.classList.add('show'); t.style.display='grid'; }
+      var d=document.getElementById('deathScreen'); if(d)d.classList.remove('show');
+      var t=document.getElementById('titleScreen'); if(t){ t.classList.add('show'); t.style.display='grid'; }
+    };
+    window.toggleMinimap = function(){
+      var box=document.getElementById('minimapBox'); if(!box) return;
+      box.classList.toggle('collapsed');
+    };
+    window.hideMinimap = function(){
+      var box=document.getElementById('minimapBox'); if(box) box.classList.add('collapsed');
+    };
+    window.toggleQuest = function(){
+      var p=document.getElementById('questPanel'); if(!p) return;
+      p.classList.toggle('collapsed');
+    };
+    window.hideQuest = function(){
+      var p=document.getElementById('questPanel'); if(p) p.classList.add('collapsed');
     };
   </script>
 
@@ -44,7 +52,6 @@
       <h1 class="logo">Dreamtale (Isometric)</h1>
       <p class="subtitle">Tap-to-move • Isometrico • Fireball AoE</p>
       <div class="menu">
-        <!-- onclick garantisce il funzionamento anche se i listener non si attaccano -->
         <button class="btn primary" onclick="startGame()">▶ Inizia</button>
         <button class="btn danger" onclick="resetSave()">🗑 Reset Salvataggio</button>
       </div>
@@ -69,27 +76,30 @@
       </div>
     </div>
     <div class="quickbar">
-      <button id="btnToggleMinimap" class="slot" title="Mostra/Nascondi minimappa">🗺️</button>
-      <button id="btnToggleQuest" class="slot" title="Mostra/Nascondi quest">📜</button>
+      <!-- ONCLICK inline: garantito -->
+      <button class="slot" title="Mostra/Nascondi minimappa" onclick="toggleMinimap()">🗺️</button>
+      <button class="slot" title="Mostra/Nascondi quest" onclick="toggleQuest()">📜</button>
     </div>
   </div>
 
   <!-- Sidebar destra -->
   <aside id="sidebar">
+    <!-- Minimap panel -->
     <div id="minimapBox" class="side-panel">
       <div class="side-head">
         <span>Minimappa</span>
-        <button id="btnHideMinimap" class="tiny" title="Nascondi">✖</button>
+        <button class="tiny" title="Nascondi" onclick="hideMinimap()">✖</button>
       </div>
       <canvas id="minimap" width="160" height="160" aria-label="Minimappa"></canvas>
     </div>
 
+    <!-- Quest panel -->
     <div id="questPanel" class="side-panel">
       <div class="side-head">
         <span>Quest</span>
         <div>
           <button id="btnQuestReset" class="tiny" title="Reset quest">↺</button>
-          <button id="btnHideQuest" class="tiny" title="Nascondi">✖</button>
+          <button class="tiny" title="Nascondi" onclick="hideQuest()">✖</button>
         </div>
       </div>
       <div class="quest">
@@ -135,8 +145,7 @@
     </div>
   </div>
 
-  <!-- Carico game.js in defer (dopo il DOM), con versione per forzare la cache -->
-  <script defer src="game.js?v=iso2.3"></script>
-  <noscript>Serve JavaScript abilitato.</noscript>
+  <!-- Carico game.js (cache buster) -->
+  <script defer src="game.js?v=iso2.4"></script>
 </body>
 </html>
