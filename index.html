@@ -1,148 +1,128 @@
 <!doctype html>
 <html lang="it">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dreamtale Isometric (Prototype)</title>
-  <link rel="stylesheet" href="style.css?v=iso2.5" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostica Canvas — Deve Vedersi</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b1224;color:#e5e7eb;font:14px system-ui}
+  #wrap{max-width:980px;margin:16px auto;padding:10px;border:1px solid #1f2a44;border-radius:12px;background:#0f172a}
+  canvas{display:block;width:100%;height:auto;border-radius:10px;border:1px solid #1f2a44;background:#0b1224;image-rendering:pixelated}
+  .bar{margin:8px 0;color:#a1a1aa}
+  #status{position:fixed;left:8px;top:8px;background:#111827;border:1px solid #1f2a44;border-radius:8px;padding:6px 10px}
+  .btn{background:#7c3aed;border:0;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+</style>
 </head>
 <body>
+<div id="status">boot: ok — se non vedi la scacchiera verde/azzurra c’è un blocco JS/CSS</div>
+<div id="wrap">
+  <p class="bar">Clicca sulla mappa per muovere il quadrato BLU (player). Il ROSSO è un “mob”. Il GIALLO sono monete.</p>
+  <button class="btn" onclick="startGame()">Avvia</button>
+  <canvas id="cv" width="960" height="600"></canvas>
+</div>
 
-  <!-- Fallback + banner di stato -->
-  <script>
-    (function(){
-      var b=document.createElement('div');
-      b.id='bootBanner';
-      b.style.cssText='position:fixed;left:8px;top:8px;background:#0b1224;color:#9ca3af;border:1px solid #1f2a44;border-radius:8px;padding:6px 10px;z-index:10000;font:12px system-ui';
-      b.textContent='boot: index.html ok — in attesa di game.js…';
-      document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(b); });
-      window.__BOOT_BANNER__=b;
-    })();
+<script>
+(function(){
+  const cv=document.getElementById('cv');
+  const ctx=cv.getContext('2d');
+  let started=false;
 
-    // Fallback UI handlers (sovrascritti da game.js se parte)
-    window.startGame = function(){
-      var t=document.getElementById('titleScreen');
-      if(t){ t.classList.remove('show'); t.style.display='none'; }
-      if(window.__BOOT_BANNER__){ __BOOT_BANNER__.textContent='startGame() fallback eseguito'; }
-    };
-    window.resetSave = function(){ try{ localStorage.clear(); }catch(e){} location.reload(); };
-    window.backToMenu = function(){
-      var d=document.getElementById('deathScreen'); if(d)d.classList.remove('show');
-      var t=document.getElementById('titleScreen'); if(t){ t.classList.add('show'); t.style.display='grid'; }
-    };
-    window.toggleMinimap = function(){
-      var box=document.getElementById('minimapBox'); if(!box) return;
-      box.classList.toggle('collapsed');
-    };
-    window.hideMinimap = function(){
-      var box=document.getElementById('minimapBox'); if(box) box.classList.add('collapsed');
-    };
-    window.toggleQuest = function(){
-      var p=document.getElementById('questPanel'); if(!p) return;
-      p.classList.toggle('collapsed');
-    };
-    window.hideQuest = function(){
-      var p=document.getElementById('questPanel'); if(p) p.classList.add('collapsed');
-    };
-  </script>
+  // mappa isometrico-like (rombi disegnati come griglia diagonale semplificata)
+  const COLS=12, ROWS=9, TW=80, TH=40;
+  const offX=cv.width/2, offY=120;
 
-  <!-- Title Screen -->
-  <div id="titleScreen" class="overlay show">
-    <div class="panel">
-      <h1 class="logo">Dreamtale (Isometric)</h1>
-      <p class="subtitle">Tap-to-move • Isometrico • Fireball AoE</p>
-      <div class="menu">
-        <button class="btn primary" onclick="startGame()">▶ Inizia</button>
-        <button class="btn danger" onclick="resetSave()">🗑 Reset Salvataggio</button>
-      </div>
-      <div class="options">
-        <label><input type="checkbox" id="optPathHighlight"> Evidenzia percorso (debug)</label>
-      </div>
-    </div>
-  </div>
+  const player={x:2,y:2};
+  const mobs=[{x:6,y:4},{x:9,y:2}];
+  const coins=[{x:3,y:6},{x:7,y:1},{x:10,y:7}];
 
-  <!-- HUD in alto -->
-  <div id="hudNostale">
-    <div class="charbox">
-      <div class="portrait"></div>
-      <div class="bars">
-        <div class="bar hp"><span id="hptext">100/100</span><div id="hpfill"></div></div>
-        <div class="bar mp"><span id="mptext">100/100</span><div id="mpfill"></div></div>
-        <div class="info">
-          <span>LV <strong id="lvl">1</strong></span>
-          <span>🪙 <strong id="coins">0</strong></span>
-          <span>🍵 <strong id="pots">0</strong></span>
-        </div>
-      </div>
-    </div>
-    <div class="quickbar">
-      <button class="slot" title="Mostra/Nascondi minimappa" onclick="toggleMinimap()">🗺️</button>
-      <button class="slot" title="Mostra/Nascondi quest" onclick="toggleQuest()">📜</button>
-    </div>
-  </div>
+  function isoToScreen(ix,iy){
+    return {x:(ix-iy)*(TW/2)+offX, y:(ix+iy)*(TH/2)+offY};
+  }
 
-  <!-- Sidebar destra -->
-  <aside id="sidebar">
-    <div id="minimapBox" class="side-panel">
-      <div class="side-head">
-        <span>Minimappa</span>
-        <button class="tiny" title="Nascondi" onclick="hideMinimap()">✖</button>
-      </div>
-      <canvas id="minimap" width="160" height="160" aria-label="Minimappa"></canvas>
-    </div>
+  function drawTile(x,y){
+    const s=isoToScreen(x,y);
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y-TH/2);
+    ctx.lineTo(s.x+TW/2, s.y);
+    ctx.lineTo(s.x, s.y+TH/2);
+    ctx.lineTo(s.x-TW/2, s.y);
+    ctx.closePath();
+    ctx.fillStyle = ((x+y)%2===0)? '#14532d' : '#166534'; // verde alternato
+    ctx.fill();
+    ctx.strokeStyle='#0b3a23';
+    ctx.stroke();
+  }
 
-    <div id="questPanel" class="side-panel">
-      <div class="side-head">
-        <span>Quest</span>
-        <div>
-          <button id="btnQuestReset" class="tiny" title="Reset quest">↺</button>
-          <button class="tiny" title="Nascondi" onclick="hideQuest()">✖</button>
-        </div>
-      </div>
-      <div class="quest">
-        <div class="q-title">Raccogli <strong id="qtarget">30</strong> monete</div>
-        <div class="q-progress"><div id="qfill"></div></div>
-        <div class="q-meta">Prog: <span id="qcount">0</span>/<span id="qmax">30</span> • Ricompensa: +<span id="qreward">30</span> EXP</div>
-      </div>
-    </div>
-  </aside>
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    // sfondo check evidente
+    ctx.fillStyle='#0a1226'; ctx.fillRect(0,0,cv.width,cv.height);
+    // tiles
+    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) drawTile(x,y);
 
-  <main>
-    <div id="wrap">
-      <canvas id="game" width="1024" height="768"></canvas>
-      <p class="note">Tocca/clicca per muoverti. Premi <b>1</b> o clicca l'icona per lanciare <b>Fireball</b> AoE.</p>
-      <div id="dbg" class="dbg"></div>
-    </div>
-  </main>
+    // coins (giallo)
+    for(const c of coins){
+      const s=isoToScreen(c.x,c.y);
+      ctx.fillStyle='#facc15';
+      ctx.beginPath(); ctx.arc(s.x, s.y-12, 10, 0, Math.PI*2); ctx.fill();
+    }
+    // mobs (rosso)
+    for(const m of mobs){
+      const s=isoToScreen(m.x,m.y);
+      ctx.fillStyle='#ef4444';
+      ctx.fillRect(s.x-14, s.y-46, 28, 36);
+      // ombra
+      ctx.fillStyle='#0006';
+      ctx.beginPath(); ctx.ellipse(s.x, s.y-6, 20, 6, 0, 0, Math.PI*2); ctx.fill();
+    }
+    // player (blu)
+    {
+      const s=isoToScreen(player.x,player.y);
+      ctx.fillStyle='#3b82f6';
+      ctx.fillRect(s.x-14, s.y-46, 28, 36);
+      ctx.fillStyle='#0006';
+      ctx.beginPath(); ctx.ellipse(s.x, s.y-6, 20, 6, 0, 0, Math.PI*2); ctx.fill();
+    }
 
-  <!-- EXP bar -->
-  <div id="expBar">
-    <div id="xpfill"></div>
-    <span id="xptext">EXP 0%</span>
-  </div>
+    // testo gigante per essere sicuri si veda qualcosa
+    ctx.fillStyle='#e5e7eb';
+    ctx.font='bold 18px system-ui';
+    ctx.fillText('DIAGNOSTICA: se vedi verde/rosso/blu, il canvas funziona.', 20, cv.height-20);
+  }
 
-  <!-- Skill bar -->
-  <div id="skillbar">
-    <button id="skill1" class="skill" title="Fireball (1)">
-      <img src="assets/fireball.png" alt="Fireball" />
-      <span class="key">1</span>
-      <div class="cd" id="skill1cd"></div>
-    </button>
-  </div>
+  function screenToIso(sx,sy){
+    const x = ((sx - offX)/(TW/2) + (sy - offY)/(TH/2))/2;
+    const y = ((sy - offY)/(TH/2) - (sx - offX)/(TW/2))/2;
+    return {x, y};
+  }
 
-  <!-- Death -->
-  <div id="deathScreen" class="overlay">
-    <div class="panel">
-      <h2 class="logo">Sei Morto</h2>
-      <p class="subtitle">Hai perso il 10% delle monete. Vuoi respawnare?</p>
-      <div class="menu">
-        <button id="btnRespawn" class="btn primary">↻ Respawn</button>
-        <button class="btn" onclick="backToMenu()">☰ Torna al Menu</button>
-      </div>
-    </div>
-  </div>
+  function handleClick(ev){
+    if(!started) return;
+    const r=cv.getBoundingClientRect();
+    const sx=(ev.clientX-r.left)*(cv.width/r.width);
+    const sy=(ev.clientY-r.top)*(cv.height/r.height);
+    const iso=screenToIso(sx,sy);
+    player.x = Math.max(0, Math.min(COLS-1, Math.round(iso.x)));
+    player.y = Math.max(0, Math.min(ROWS-1, Math.round(iso.y)));
+    draw();
+  }
 
-  <!-- Carico game.js (cache buster) -->
-  <script defer src="game.js?v=iso2.5"></script>
+  cv.addEventListener('click', handleClick);
+
+  window.startGame = function(){
+    started=true;
+    document.getElementById('status').textContent='running: OK — click per muovere il quadrato BLU';
+    draw();
+  };
+
+  // draw una volta “spento”
+  draw();
+
+  // Diagnostica base
+  try{
+    document.getElementById('status').textContent='boot: pronto — premi Avvia. Se non vedi nulla, JS bloccato.';
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
