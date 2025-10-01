@@ -4,9 +4,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dreamtale Isometric (Prototype)</title>
-  <link rel="stylesheet" href="style.css?v=iso2.2" />
+  <link rel="stylesheet" href="style.css?v=iso2.3" />
 </head>
 <body>
+
+  <!-- Fallback: funzioni globali per i bottoni, definite PRIMA di caricare game.js -->
+  <script>
+    // banner di boot (se game.js non parte, almeno vediamo questo)
+    (function(){
+      var b=document.createElement('div');
+      b.id='bootBanner';
+      b.style.cssText='position:fixed;left:8px;top:8px;background:#0b1224;color:#9ca3af;border:1px solid #1f2a44;border-radius:8px;padding:6px 10px;z-index:10000;font:12px system-ui';
+      b.textContent='boot: index.html ok — in attesa di game.js…';
+      document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(b); });
+      window.__BOOT_BANNER__=b;
+    })();
+
+    // Fallback handler: vengono sovrascritti da game.js se carica
+    window.startGame = function(){
+      var t=document.getElementById('titleScreen');
+      if(t){ t.classList.remove('show'); t.style.display='none'; }
+      if(window.__BOOT_BANNER__){ __BOOT_BANNER__.textContent='boot: startGame() fallback eseguito'; }
+    };
+    window.resetSave = function(){
+      try{ localStorage.clear(); }catch(e){}
+      location.reload();
+    };
+    window.backToMenu = function(){
+      var d=document.getElementById('deathScreen');
+      if(d) d.classList.remove('show');
+      var t=document.getElementById('titleScreen');
+      if(t){ t.classList.add('show'); t.style.display='grid'; }
+    };
+  </script>
 
   <!-- Title Screen -->
   <div id="titleScreen" class="overlay show">
@@ -14,7 +44,7 @@
       <h1 class="logo">Dreamtale (Isometric)</h1>
       <p class="subtitle">Tap-to-move • Isometrico • Fireball AoE</p>
       <div class="menu">
-        <!-- NB: onclick garantisce il funzionamento anche senza listener -->
+        <!-- onclick garantisce il funzionamento anche se i listener non si attaccano -->
         <button class="btn primary" onclick="startGame()">▶ Inizia</button>
         <button class="btn danger" onclick="resetSave()">🗑 Reset Salvataggio</button>
       </div>
@@ -100,11 +130,13 @@
       <p class="subtitle">Hai perso il 10% delle monete. Vuoi respawnare?</p>
       <div class="menu">
         <button id="btnRespawn" class="btn primary">↻ Respawn</button>
-        <button id="btnMenu" class="btn" onclick="backToMenu()">☰ Torna al Menu</button>
+        <button class="btn" onclick="backToMenu()">☰ Torna al Menu</button>
       </div>
     </div>
   </div>
 
-  <script src="game.js?v=iso2.2"></script>
+  <!-- Carico game.js in defer (dopo il DOM), con versione per forzare la cache -->
+  <script defer src="game.js?v=iso2.3"></script>
+  <noscript>Serve JavaScript abilitato.</noscript>
 </body>
 </html>
