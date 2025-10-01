@@ -57,10 +57,10 @@ $('qtarget').textContent=QUEST_TARGET; $('qmax').textContent=QUEST_TARGET; $('qr
 const qfill=$('qfill'), qcount=$('qcount');
 
 // Save keys
-const SAVE_KEY='dreamtale_iso_save_v2_4';
-const UI_KEY='dreamtale_iso_ui_v2_4';
+const SAVE_KEY='dreamtale_iso_save_v2_5';
+const UI_KEY='dreamtale_iso_ui_v2_5';
 
-// ===== Global handlers (sovrascrivono i fallback HTML) =====
+// ===== Global handlers =====
 window.startGame = function(){
   const t = document.getElementById('titleScreen');
   if (t) { t.classList.remove('show'); t.style.display = 'none'; }
@@ -74,18 +74,10 @@ window.backToMenu = function(){
   const t = document.getElementById('titleScreen');
   if (t) { t.classList.add('show'); t.style.display = 'grid'; }
 };
-window.toggleMinimap = function(){
-  minimapBox.classList.toggle('collapsed'); saveUI();
-};
-window.hideMinimap = function(){
-  minimapBox.classList.add('collapsed'); saveUI();
-};
-window.toggleQuest = function(){
-  questPanel.classList.toggle('collapsed'); saveUI();
-};
-window.hideQuest = function(){
-  questPanel.classList.add('collapsed'); saveUI();
-};
+window.toggleMinimap = function(){ minimapBox.classList.toggle('collapsed'); saveUI(); };
+window.hideMinimap   = function(){ minimapBox.classList.add('collapsed'); saveUI(); };
+window.toggleQuest   = function(){ questPanel.classList.toggle('collapsed'); saveUI(); };
+window.hideQuest     = function(){ questPanel.classList.add('collapsed'); saveUI(); };
 
 // ===== Assets con placeholder =====
 const IMGS={}, SRC={
@@ -103,20 +95,16 @@ function placeholderCanvas(w,h,draw){
 }
 function makeTileFallback(){
   return placeholderCanvas(isoTileW,isoTileH,(x,w,h)=>{
-    x.clearRect(0,0,w,h);
-    x.beginPath();
-    x.moveTo(w/2,0); x.lineTo(w, h/2); x.lineTo(w/2,h); x.lineTo(0,h/2); x.closePath();
-    x.fillStyle='#3E5E3B'; x.fill();
-    x.strokeStyle='#223821'; x.lineWidth=2; x.stroke();
+    x.beginPath(); x.moveTo(w/2,0); x.lineTo(w,h/2); x.lineTo(w/2,h); x.lineTo(0,h/2); x.closePath();
+    x.fillStyle='#3E5E3B'; x.fill(); x.strokeStyle='#223821'; x.lineWidth=2; x.stroke();
   });
 }
 function makeSpriteFallback(color='#9ca3af'){
   return placeholderCanvas(96,128,(x,w,h)=>{
     x.fillStyle=color; x.fillRect(w/2-12, h/2-28, 24, 56);
-    x.fillStyle='#00000055'; x.beginPath(); x.ellipse(w/2, h-12, 22, 6, 0, 0, Math.PI*2); x.fill();
+    x.fillStyle='#0006'; x.beginPath(); x.ellipse(w/2, h-10, 20, 6, 0, 0, Math.PI*2); x.fill();
   });
 }
-
 async function loadAll(){
   const tileFallback = makeTileFallback();
   const playerFallback = makeSpriteFallback('#9fb4ff');
@@ -148,7 +136,9 @@ function genMap(){
   }
 }
 const worldOffsetX = screenW/2;
+theWorldOffsetY = 180; // typo fixed in next line, keep constant below
 const worldOffsetY = 180;
+
 function isoToScreen(ix,iy){
   return { x:(ix - iy)*(isoTileW/2) + worldOffsetX, y:(ix + iy)*(isoTileH/2) + worldOffsetY };
 }
@@ -370,13 +360,12 @@ function updateProjectiles(){
   if(skill1cd){ skill1cd.style.height = (pct*100)+'%'; }
 }
 
-// ===== Rendering con fallback se le immagini mancano =====
+// ===== Rendering con fallback =====
 function drawIsoTile(x,y){
   const s=isoToScreen(x,y);
   const img=IMGS.tile;
   if(img && img.width){ ctx.drawImage(img, s.x-isoTileW/2, s.y-isoTileH/2, isoTileW, isoTileH); }
   else {
-    // Fallback: disegno un rombo verde
     ctx.beginPath();
     ctx.moveTo(s.x, s.y-isoTileH/2);
     ctx.lineTo(s.x+isoTileW/2, s.y);
@@ -390,7 +379,6 @@ function drawIsoTile(x,y){
 function drawSprite(img, sx, sy, w, h, colorFallback='#9ca3af'){
   if(img && img.width){ ctx.drawImage(img, sx, sy, w, h); }
   else {
-    // Fallback: sagoma
     ctx.fillStyle=colorFallback;
     ctx.fillRect(sx + w/2 - 12, sy + h/2 - 28, 24, 56);
     ctx.fillStyle='#0006';
@@ -410,26 +398,21 @@ function draw(){
   }
 
   const drawables=[];
-  // oggetti
   coins.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>drawSprite(IMGS.coin, s.x-24, s.y-32, 48,48, '#f5c427')}); });
   potions.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>drawSprite(IMGS.potion, s.x-24, s.y-48, 48,64, '#c03c64')}); });
-  // alberi (blocchi)
   for(let y=0;y<mapRows;y++) for(let x=0;x<mapCols;x++) if(map[y][x]===1){
     const s=isoToScreen(x,y); drawables.push({z:x+y+0.5, fn:()=>drawSprite(IMGS.tree, s.x-64, s.y-140, 128,160, '#3b7a3b')});
   }
-  // nemici
   enemies.forEach(e=>{ const s=isoToScreen(e.x,e.y); drawables.push({z:e.x+e.y+0.25, fn:()=>drawSprite(IMGS.enemy, s.x-48, s.y-96, 96,128, '#8be9fd')}); });
-  // player
   { const s=isoToScreen(player.x,player.y); drawables.push({z:player.x+player.y+0.25, fn:()=>drawSprite(IMGS.player, s.x-48, s.y-96, 96,128, '#9fb4ff')}); }
 
   drawables.sort((a,b)=>a.z-b.z);
   drawables.forEach(d=>d.fn());
 
-  // proiettili
   projectiles.forEach(p=>{ drawSprite(IMGS.fireball, p.x-24, p.y-24, 48,48, '#ff7800'); });
 
   drawMinimap();
-  if(dbg) dbg.textContent = `ISO v2.4 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
+  if(dbg) dbg.textContent = `ISO v2.5 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
 }
 
 function drawMinimap(){
@@ -495,13 +478,8 @@ window.addEventListener('keydown', (e)=>{
   }
 });
 
-// Click-to-move & aim
+// Click-to-move & aim — **FIX: un solo handler corretto**
 let lastClick=null;
-c.addEventListener('pointerdown', (e)=>{
-  const rect=c.getBoundingClientRect();
-  const sx=(e.clientX-rect.left)*(c.width/r.width), sy=(e.clientY-rect.top)*(c.height/r.height);
-  // fix: su alcuni browser r non esiste, quindi calcolo r prima
-});
 c.addEventListener('pointerdown', (e)=>{
   const r=c.getBoundingClientRect();
   const sx=(e.clientX-r.left)*(c.width/r.width), sy=(e.clientY-r.top)*(c.height/r.height);
@@ -521,9 +499,11 @@ window.addEventListener('error', (e)=>{
     genMap();
     const loaded = loadGame();
     if(!loaded){ spawnAll(); }
+    // ripristina stato UI
+    loadUI();
     updateHUD(); draw();
     const b = window.__BOOT_BANNER__;
-    if(b){ b.textContent = 'ready: tutto ok ✓ (iso2.4)'; }
+    if(b){ b.textContent = 'ready: tutto ok ✓ (iso2.5)'; }
   }catch(err){
     const b = window.__BOOT_BANNER__;
     if(b){ b.textContent = 'ERRORE in init: '+(err && err.message ? err.message : err); b.style.color='#fca5a5'; }
