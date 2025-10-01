@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dreamtale Isometric (Prototype)</title>
+  <link rel="stylesheet" href="style.css?v=iso2" />
+</head>
+<body>
+
+  <!-- Title Screen -->
+  <div id="titleScreen" class="overlay show">
+    <div class="panel">
+      <h1 class="logo">Dreamtale (Isometric)</h1>
+      <p class="subtitle">Tap-to-move • Isometrico • Fireball AoE</p>
+      <div class="menu">
+        <button id="btnStart" class="btn primary">▶ Inizia</button>
+        <button id="btnReset" class="btn danger">🗑 Reset Salvataggio</button>
+      </div>
+      <div class="options">
+        <label><input type="checkbox" id="optPathHighlight"> Evidenzia percorso (debug)</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD in alto -->
+  <div id="hudNostale">
+    <div class="charbox">
+      <div class="portrait"></div>
+      <div class="bars">
+        <div class="bar hp"><span id="hptext">100/100</span><div id="hpfill"></div></div>
+        <div class="bar mp"><span id="mptext">100/100</span><div id="mpfill"></div></div>
+        <div class="info">
+          <span>LV <strong id="lvl">1</strong></span>
+          <span>🪙 <strong id="coins">0</strong></span>
+          <span>🍵 <strong id="pots">0</strong></span>
+        </div>
+      </div>
+    </div>
+    <div class="quickbar">
+      <button id="btnToggleMinimap" class="slot" title="Mostra/Nascondi minimappa">🗺️</button>
+      <button id="btnToggleQuest" class="slot" title="Mostra/Nascondi quest">📜</button>
+    </div>
+  </div>
+
+  <!-- Sidebar destra -->
+  <aside id="sidebar">
+    <!-- Minimap panel -->
+    <div id="minimapBox" class="side-panel">
+      <div class="side-head">
+        <span>Minimappa</span>
+        <button id="btnHideMinimap" class="tiny" title="Nascondi">✖</button>
+      </div>
+      <canvas id="minimap" width="160" height="160" aria-label="Minimappa"></canvas>
+    </div>
+
+    <!-- Quest panel -->
+    <div id="questPanel" class="side-panel">
+      <div class="side-head">
+        <span>Quest</span>
+        <div>
+          <button id="btnQuestReset" class="tiny" title="Reset quest">↺</button>
+          <button id="btnHideQuest" class="tiny" title="Nascondi">✖</button>
+        </div>
+      </div>
+      <div class="quest">
+        <div class="q-title">Raccogli <strong id="qtarget">30</strong> monete</div>
+        <div class="q-progress"><div id="qfill"></div></div>
+        <div class="q-meta">Prog: <span id="qcount">0</span>/<span id="qmax">30</span> • Ricompensa: +<span id="qreward">30</span> EXP</div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="wrap">
+      <canvas id="game" width="1024" height="768"></canvas>
+      <p class="note">Tocca/clicca per muoverti. Premi <b>1</b> o clicca l'icona per lanciare <b>Fireball</b> AoE.</p>
+      <div id="dbg" class="dbg"></div>
+    </div>
+  </main>
+
+  <!-- EXP bar -->
+  <div id="expBar">
+    <div id="xpfill"></div>
+    <span id="xptext">EXP 0%</span>
+  </div>
+
+  <!-- Skill bar -->
+  <div id="skillbar">
+    <button id="skill1" class="skill" title="Fireball (1)">
+      <img src="assets/fireball.png" alt="Fireball" />
+      <span class="key">1</span>
+      <div class="cd" id="skill1cd"></div>
+    </button>
+  </div>
+
+  <!-- Death -->
+  <div id="deathScreen" class="overlay">
+    <div class="panel">
+      <h2 class="logo">Sei Morto</h2>
+      <p class="subtitle">Hai perso il 10% delle monete. Vuoi respawnare?</p>
+      <div class="menu">
+        <button id="btnRespawn" class="btn primary">↻ Respawn</button>
+        <button id="btnMenu" class="btn">☰ Torna al Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js?v=iso2"></script>
+</body>
+</html>
