@@ -1,6 +1,12 @@
+// Mostra che game.js è partito
+(function(){
+  const b = window.__BOOT_BANNER__;
+  if(b){ b.textContent = 'boot: game.js caricato ✓'; }
+})();
+
 // ====== Config base (isometric) ======
 const mapCols=10, mapRows=10;
-const isoTileW=128, isoTileH=64;   // rapporto 2:1
+const isoTileW=128, isoTileH=64;
 const screenW=1024, screenH=768;
 const c = document.getElementById('game'); c.width=screenW; c.height=screenH;
 const ctx = c.getContext('2d');
@@ -53,10 +59,10 @@ $('qtarget').textContent=QUEST_TARGET; $('qmax').textContent=QUEST_TARGET; $('qr
 const qfill=$('qfill'), qcount=$('qcount');
 
 // Save keys
-const SAVE_KEY='dreamtale_iso_save_v2_2';
-const UI_KEY='dreamtale_iso_ui_v2_2';
+const SAVE_KEY='dreamtale_iso_save_v2_3';
+const UI_KEY='dreamtale_iso_ui_v2_3';
 
-// ====== GLOBAL HANDLERS (menu) ======
+// ====== GLOBALI (sovrascrivono i fallback) ======
 window.startGame = function(){
   const t = document.getElementById('titleScreen');
   if (t) { t.classList.remove('show'); t.style.display = 'none'; }
@@ -74,7 +80,7 @@ window.backToMenu = function(){
   if (t) { t.classList.add('show'); t.style.display = 'grid'; }
 };
 
-// ===== Assets =====
+// ===== Assets (tolleranti ai 404) =====
 const IMGS={}, SRC={
   tile:'assets/tile_ground.png',
   tree:'assets/tree.png',
@@ -84,7 +90,7 @@ const IMGS={}, SRC={
   potion:'assets/potion.png',
   fireball:'assets/fireball.png'
 };
-function makePlaceholder(w=64,h=64,label='?'){
+function placeholder(w=64,h=64,label='?'){
   const cvs=document.createElement('canvas'); cvs.width=w; cvs.height=h;
   const x=cvs.getContext('2d'); x.fillStyle='#222'; x.fillRect(0,0,w,h);
   x.strokeStyle='#f00'; x.lineWidth=3; x.strokeRect(2,2,w-4,h-4);
@@ -93,7 +99,10 @@ function makePlaceholder(w=64,h=64,label='?'){
 }
 async function loadAll(){
   await Promise.all(Object.entries(SRC).map(([k,src])=>new Promise(res=>{
-    const im=new Image(); im.onload=()=>{IMGS[k]=im;res()}; im.onerror=()=>{IMGS[k]=makePlaceholder(64,64,k[0]);res()}; im.src=src;
+    const im=new Image();
+    im.onload=()=>{IMGS[k]=im;res()};
+    im.onerror=()=>{IMGS[k]=placeholder(64,64,k[0]);res()};
+    im.src=src;
   })));
 }
 
@@ -103,7 +112,7 @@ function rngSeed(seed){ let s=seed>>>0; return ()=>{ s = (s*1664525 + 1013904223
 let rnd=rngSeed(1337);
 
 function genMap(){
-  map = Array.from({length:mapRows}, ()=>Array.from({length:mapCols}, ()=>0)); // 0 ground, 1 tree (blocked)
+  map = Array.from({length:mapRows}, ()=>Array.from({length:mapCols}, ()=>0)); // 0 walkable, 1 blocked (tree)
   for(let i=0;i<14;i++){
     const x=Math.floor(rnd()*mapCols), y=Math.floor(rnd()*mapRows);
     if(x===0&&y===0) continue; map[y][x]=1;
@@ -341,14 +350,18 @@ function updateProjectiles(){
   if(skill1cd){ skill1cd.style.height = (pct*100)+'%'; }
 }
 
-// ===== Rendering (isometric) =====
+// ===== Rendering =====
+function isoDrawTile(img, x, y){
+  const s=isoToScreen(x,y);
+  ctx.drawImage(img, s.x-isoTileW/2, s.y-isoTileH/2, isoTileW, isoTileH);
+}
+
 function draw(){
   ctx.clearRect(0,0,screenW,screenH);
   // ground
   for(let y=0;y<mapRows;y++){
     for(let x=0;x<mapCols;x++){
-      const s=isoToScreen(x,y);
-      ctx.drawImage(IMGS.tile, s.x-isoTileW/2, s.y-isoTileH/2, isoTileW, isoTileH);
+      isoDrawTile(IMGS.tile, x, y);
     }
   }
   if(optPathHighlight && optPathHighlight.checked && pathQueue.length){
@@ -356,22 +369,24 @@ function draw(){
     pathQueue.forEach(p=>{ const s=isoToScreen(p.x,p.y); ctx.beginPath(); ctx.moveTo(s.x, s.y-isoTileH/2); ctx.lineTo(s.x+isoTileW/2, s.y); ctx.lineTo(s.x, s.y+isoTileH/2); ctx.lineTo(s.x-isoTileW/2, s.y); ctx.closePath(); ctx.fill(); });
     ctx.restore();
   }
-  // drawables con z-order
   const drawables=[];
+  // oggetti
   coins.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.coin, s.x-24, s.y-32, 48,48)}); });
   potions.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.potion, s.x-24, s.y-48, 48,64)}); });
+  // alberi (blocchi)
   for(let y=0;y<mapRows;y++) for(let x=0;x<mapCols;x++) if(map[y][x]===1){
     const s=isoToScreen(x,y); drawables.push({z:x+y+0.5, fn:()=>ctx.drawImage(IMGS.tree, s.x-64, s.y-140, 128,160)});
   }
+  // nemici
   enemies.forEach(e=>{ const s=isoToScreen(e.x,e.y); drawables.push({z:e.x+e.y+0.25, fn:()=>ctx.drawImage(IMGS.enemy, s.x-48, s.y-96, 96,128)}); });
+  // player
   { const s=isoToScreen(player.x,player.y); drawables.push({z:player.x+player.y+0.25, fn:()=>ctx.drawImage(IMGS.player, s.x-48, s.y-96, 96,128)}); }
-  drawables.sort((a,b)=>a.z-b.z);
-  drawables.forEach(d=>d.fn());
-  // projectiles sopra
+  drawables.sort((a,b)=>a.z-b.z); drawables.forEach(d=>d.fn());
+  // proiettili
   projectiles.forEach(p=>{ if(p.type==='fireball'){ ctx.drawImage(IMGS.fireball, p.x-24, p.y-24, 48,48); }});
   // minimappa + debug
   drawMinimap();
-  if(dbg) dbg.textContent = `ISO v2.2 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
+  if(dbg) dbg.textContent = `ISO v2.3 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
 }
 
 function drawMinimap(){
@@ -453,11 +468,22 @@ c.addEventListener('pointerdown', (e)=>{
 c.addEventListener('click', handleTap);
 
 // ===== Init =====
+window.addEventListener('error', (e)=>{
+  const b = window.__BOOT_BANNER__;
+  if(b){ b.textContent = 'ERRORE game.js: ' + (e && e.message ? e.message : 'sconosciuto'); b.style.color='#fca5a5'; }
+});
 (async function(){
-  await loadAll();
-  genMap();
-  const loaded = loadGame();
-  if(!loaded){ spawnAll(); }
-  updateHUD(); draw();
-  if(dbg) dbg.textContent="Isometric engine ready";
+  try{
+    await loadAll();
+    genMap();
+    const loaded = loadGame();
+    if(!loaded){ spawnAll(); }
+    updateHUD(); draw();
+    const b = window.__BOOT_BANNER__;
+    if(b){ b.textContent = 'ready: tutto ok ✓ (menu con onclick)'; }
+  }catch(err){
+    const b = window.__BOOT_BANNER__;
+    if(b){ b.textContent = 'ERRORE in init: '+(err && err.message ? err.message : err); b.style.color='#fca5a5'; }
+    console.error(err);
+  }
 })();
