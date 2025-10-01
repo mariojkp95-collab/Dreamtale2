@@ -1,10 +1,10 @@
-// Mostra che game.js è partito
+// Banner: segnala che game.js è partito
 (function(){
   const b = window.__BOOT_BANNER__;
   if(b){ b.textContent = 'boot: game.js caricato ✓'; }
 })();
 
-// ====== Config base (isometric) ======
+// ===== Config base =====
 const mapCols=10, mapRows=10;
 const isoTileW=128, isoTileH=64;
 const screenW=1024, screenH=768;
@@ -23,8 +23,6 @@ const optPathHighlight=$('optPathHighlight');
 // Panels
 const minimap=$('minimap'); const mmctx=minimap.getContext('2d');
 const minimapBox=$('minimapBox'), questPanel=$('questPanel');
-const btnHideMinimap=$('btnHideMinimap'), btnHideQuest=$('btnHideQuest');
-const btnToggleMinimap=$('btnToggleMinimap'), btnToggleQuest=$('btnToggleQuest');
 const btnQuestReset=$('btnQuestReset');
 
 // Death
@@ -48,7 +46,7 @@ const ENEMY_ATK_MIN=3, ENEMY_ATK_MAX=6, ENEMY_ATK_CD_MS=900;
 // Drops
 const DROP_COIN_CHANCE=.35, DROP_POTION_CHANCE=.10;
 
-// Fireball skill
+// Fireball
 const FB_MP_COST=10, FB_COOLDOWN_MS=2000, FB_SPEED=10;
 let fbReadyTs=0;
 let projectiles=[];
@@ -59,19 +57,16 @@ $('qtarget').textContent=QUEST_TARGET; $('qmax').textContent=QUEST_TARGET; $('qr
 const qfill=$('qfill'), qcount=$('qcount');
 
 // Save keys
-const SAVE_KEY='dreamtale_iso_save_v2_3';
-const UI_KEY='dreamtale_iso_ui_v2_3';
+const SAVE_KEY='dreamtale_iso_save_v2_4';
+const UI_KEY='dreamtale_iso_ui_v2_4';
 
-// ====== GLOBALI (sovrascrivono i fallback) ======
+// ===== Global handlers (sovrascrivono i fallback HTML) =====
 window.startGame = function(){
   const t = document.getElementById('titleScreen');
   if (t) { t.classList.remove('show'); t.style.display = 'none'; }
 };
 window.resetSave = function(){
-  try{
-    localStorage.removeItem(SAVE_KEY);
-    localStorage.removeItem(UI_KEY);
-  }catch{}
+  try{ localStorage.removeItem(SAVE_KEY); localStorage.removeItem(UI_KEY); }catch{}
   location.reload();
 };
 window.backToMenu = function(){
@@ -79,8 +74,20 @@ window.backToMenu = function(){
   const t = document.getElementById('titleScreen');
   if (t) { t.classList.add('show'); t.style.display = 'grid'; }
 };
+window.toggleMinimap = function(){
+  minimapBox.classList.toggle('collapsed'); saveUI();
+};
+window.hideMinimap = function(){
+  minimapBox.classList.add('collapsed'); saveUI();
+};
+window.toggleQuest = function(){
+  questPanel.classList.toggle('collapsed'); saveUI();
+};
+window.hideQuest = function(){
+  questPanel.classList.add('collapsed'); saveUI();
+};
 
-// ===== Assets (tolleranti ai 404) =====
+// ===== Assets con placeholder =====
 const IMGS={}, SRC={
   tile:'assets/tile_ground.png',
   tree:'assets/tree.png',
@@ -90,49 +97,66 @@ const IMGS={}, SRC={
   potion:'assets/potion.png',
   fireball:'assets/fireball.png'
 };
-function placeholder(w=64,h=64,label='?'){
+function placeholderCanvas(w,h,draw){
   const cvs=document.createElement('canvas'); cvs.width=w; cvs.height=h;
-  const x=cvs.getContext('2d'); x.fillStyle='#222'; x.fillRect(0,0,w,h);
-  x.strokeStyle='#f00'; x.lineWidth=3; x.strokeRect(2,2,w-4,h-4);
-  x.fillStyle='#fff'; x.font='bold 16px system-ui'; x.textAlign='center'; x.textBaseline='middle';
-  x.fillText(label, w/2, h/2); const img=new Image(); img.src=cvs.toDataURL(); return img;
+  const x=cvs.getContext('2d'); draw(x,w,h); const img=new Image(); img.src=cvs.toDataURL(); return img;
 }
+function makeTileFallback(){
+  return placeholderCanvas(isoTileW,isoTileH,(x,w,h)=>{
+    x.clearRect(0,0,w,h);
+    x.beginPath();
+    x.moveTo(w/2,0); x.lineTo(w, h/2); x.lineTo(w/2,h); x.lineTo(0,h/2); x.closePath();
+    x.fillStyle='#3E5E3B'; x.fill();
+    x.strokeStyle='#223821'; x.lineWidth=2; x.stroke();
+  });
+}
+function makeSpriteFallback(color='#9ca3af'){
+  return placeholderCanvas(96,128,(x,w,h)=>{
+    x.fillStyle=color; x.fillRect(w/2-12, h/2-28, 24, 56);
+    x.fillStyle='#00000055'; x.beginPath(); x.ellipse(w/2, h-12, 22, 6, 0, 0, Math.PI*2); x.fill();
+  });
+}
+
 async function loadAll(){
+  const tileFallback = makeTileFallback();
+  const playerFallback = makeSpriteFallback('#9fb4ff');
+  const enemyFallback  = makeSpriteFallback('#8be9fd');
+  const coinFallback = placeholderCanvas(48,48,(x,w,h)=>{ x.fillStyle='#f5c427'; x.beginPath(); x.arc(w/2,h/2,20,0,Math.PI*2); x.fill(); });
+  const potionFallback = placeholderCanvas(48,64,(x,w,h)=>{ x.strokeStyle='#8080a0'; x.lineWidth=3; x.strokeRect(8,12,32,40); x.fillStyle='#c03c64bb'; x.fillRect(10,28,28,22); });
+  const fireballFallback = placeholderCanvas(48,48,(x,w,h)=>{ x.fillStyle='#ff7800'; x.beginPath(); x.arc(w/2,h/2,18,0,Math.PI*2); x.fill(); });
+
+  const fallbacks = {tile:tileFallback, player:playerFallback, enemy:enemyFallback, coin:coinFallback, potion:potionFallback, fireball:fireballFallback};
+
   await Promise.all(Object.entries(SRC).map(([k,src])=>new Promise(res=>{
     const im=new Image();
     im.onload=()=>{IMGS[k]=im;res()};
-    im.onerror=()=>{IMGS[k]=placeholder(64,64,k[0]);res()};
+    im.onerror=()=>{IMGS[k]=fallbacks[k] || makeSpriteFallback();res()};
     im.src=src;
   })));
 }
 
-// ===== Map & math (isometric) =====
+// ===== Mappa & math isometrico =====
 let map=[];
 function rngSeed(seed){ let s=seed>>>0; return ()=>{ s = (s*1664525 + 1013904223)>>>0; return s/2**32; }; }
 let rnd=rngSeed(1337);
 
 function genMap(){
-  map = Array.from({length:mapRows}, ()=>Array.from({length:mapCols}, ()=>0)); // 0 walkable, 1 blocked (tree)
+  map = Array.from({length:mapRows}, ()=>Array.from({length:mapCols}, ()=>0));
   for(let i=0;i<14;i++){
     const x=Math.floor(rnd()*mapCols), y=Math.floor(rnd()*mapRows);
     if(x===0&&y===0) continue; map[y][x]=1;
   }
 }
-
 const worldOffsetX = screenW/2;
 const worldOffsetY = 180;
-
 function isoToScreen(ix,iy){
-  const sx = (ix - iy)*(isoTileW/2) + worldOffsetX;
-  const sy = (ix + iy)*(isoTileH/2) + worldOffsetY;
-  return {x:sx, y:sy};
+  return { x:(ix - iy)*(isoTileW/2) + worldOffsetX, y:(ix + iy)*(isoTileH/2) + worldOffsetY };
 }
 function screenToIso(sx,sy){
   const x = ((sx - worldOffsetX)/ (isoTileW/2) + (sy - worldOffsetY)/(isoTileH/2))/2;
   const y = ((sy - worldOffsetY)/(isoTileH/2) - (sx - worldOffsetX)/(isoTileW/2))/2;
   return {x, y};
 }
-
 function isWalkableTile(x,y){ return x>=0 && y>=0 && x<mapCols && y<mapRows && map[y][x]===0; }
 function isEnemyAt(x,y){ return enemies.some(e=>e.x===x && e.y===y); }
 function isWalkableDynamic(x,y){ return isWalkableTile(x,y) && !isEnemyAt(x,y); }
@@ -163,7 +187,7 @@ function spawnAll(){
   for(let i=0;i<2;i++) potions.push(randEmpty([...coins,...enemies,...potions]));
 }
 
-// ===== UI updates =====
+// ===== UI =====
 function updateHUD(){
   const hpR=Math.max(0,Math.min(1,player.hp/player.maxHp));
   const mpR=Math.max(0,Math.min(1,player.mp/player.maxMp));
@@ -183,10 +207,7 @@ function gainExp(n){
   updateHUD(); saveGame();
 }
 
-// ===== Save/UI state =====
-function saveGame(){
-  try{ localStorage.setItem(SAVE_KEY, JSON.stringify({player,enemies,coins,potions,map})); }catch{}
-}
+function saveGame(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({player,enemies,coins,potions,map})); }catch{} }
 function loadGame(){
   try{
     const d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); if(!d||!d.player) return false;
@@ -284,7 +305,7 @@ function enemyAI(ts){
 
     if(e.ai==='aggro'){
       if(ts >= (e.nextRepath||0)){
-        const candidates=[[1,0],[-1,0],[0,1],[0,-1]].map(d=>({x:player.x-d[0], y:player.y-d[1]}))
+        const candidates=[[1,0],[-1,0],[0,1],[0,-1)].map(d=>({x:player.x-d[0], y:player.y-d[1]}))
           .filter(p=>isWalkableTile(p.x,p.y) && !(p.x===player.x&&p.y===player.y));
         let target = candidates.find(p=>!isEnemyAt(p.x,p.y)) || {x:player.x,y:player.y};
         e.path = findPath(e.x,e.y,target.x,target.y,false) || [];
@@ -333,13 +354,12 @@ function updateProjectiles(){
       const iso=screenToIso(p.x, p.y);
       const tx=Math.round(iso.x), ty=Math.round(iso.y);
       enemies.forEach(e=>{
-        const d = Math.max(Math.abs(e.x-tx), Math.abs(e.y-ty)); // raggio 1 (8 caselle)
+        const d = Math.max(Math.abs(e.x-tx), Math.abs(e.y-ty));
         if(d<=1){
           e.hp = Math.max(0, e.hp - (10 + Math.floor(Math.random()*8)));
           if(e.hp===0) onEnemyDeath(e);
         }
       });
-      // piccolo flash
       ctx.save(); ctx.globalAlpha=0.35; ctx.fillStyle='#ff7b00'; ctx.beginPath(); ctx.arc(p.x, p.y, 36, 0, Math.PI*2); ctx.fill(); ctx.restore();
       projectiles.splice(i,1);
     }
@@ -350,43 +370,66 @@ function updateProjectiles(){
   if(skill1cd){ skill1cd.style.height = (pct*100)+'%'; }
 }
 
-// ===== Rendering =====
-function isoDrawTile(img, x, y){
+// ===== Rendering con fallback se le immagini mancano =====
+function drawIsoTile(x,y){
   const s=isoToScreen(x,y);
-  ctx.drawImage(img, s.x-isoTileW/2, s.y-isoTileH/2, isoTileW, isoTileH);
+  const img=IMGS.tile;
+  if(img && img.width){ ctx.drawImage(img, s.x-isoTileW/2, s.y-isoTileH/2, isoTileW, isoTileH); }
+  else {
+    // Fallback: disegno un rombo verde
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y-isoTileH/2);
+    ctx.lineTo(s.x+isoTileW/2, s.y);
+    ctx.lineTo(s.x, s.y+isoTileH/2);
+    ctx.lineTo(s.x-isoTileW/2, s.y);
+    ctx.closePath();
+    ctx.fillStyle='#2f4f2f'; ctx.fill();
+    ctx.strokeStyle='#1e3820'; ctx.stroke();
+  }
+}
+function drawSprite(img, sx, sy, w, h, colorFallback='#9ca3af'){
+  if(img && img.width){ ctx.drawImage(img, sx, sy, w, h); }
+  else {
+    // Fallback: sagoma
+    ctx.fillStyle=colorFallback;
+    ctx.fillRect(sx + w/2 - 12, sy + h/2 - 28, 24, 56);
+    ctx.fillStyle='#0006';
+    ctx.beginPath(); ctx.ellipse(sx+w/2, sy+h-8, 18, 6, 0, 0, Math.PI*2); ctx.fill();
+  }
 }
 
 function draw(){
   ctx.clearRect(0,0,screenW,screenH);
-  // ground
-  for(let y=0;y<mapRows;y++){
-    for(let x=0;x<mapCols;x++){
-      isoDrawTile(IMGS.tile, x, y);
-    }
-  }
+  // terreno
+  for(let y=0;y<mapRows;y++) for(let x=0;x<mapCols;x++) drawIsoTile(x,y);
+
   if(optPathHighlight && optPathHighlight.checked && pathQueue.length){
     ctx.save(); ctx.globalAlpha=.25; ctx.fillStyle='#60a5fa';
     pathQueue.forEach(p=>{ const s=isoToScreen(p.x,p.y); ctx.beginPath(); ctx.moveTo(s.x, s.y-isoTileH/2); ctx.lineTo(s.x+isoTileW/2, s.y); ctx.lineTo(s.x, s.y+isoTileH/2); ctx.lineTo(s.x-isoTileW/2, s.y); ctx.closePath(); ctx.fill(); });
     ctx.restore();
   }
+
   const drawables=[];
   // oggetti
-  coins.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.coin, s.x-24, s.y-32, 48,48)}); });
-  potions.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>ctx.drawImage(IMGS.potion, s.x-24, s.y-48, 48,64)}); });
+  coins.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>drawSprite(IMGS.coin, s.x-24, s.y-32, 48,48, '#f5c427')}); });
+  potions.forEach(o=>{ const s=isoToScreen(o.x,o.y); drawables.push({z:o.x+o.y, fn:()=>drawSprite(IMGS.potion, s.x-24, s.y-48, 48,64, '#c03c64')}); });
   // alberi (blocchi)
   for(let y=0;y<mapRows;y++) for(let x=0;x<mapCols;x++) if(map[y][x]===1){
-    const s=isoToScreen(x,y); drawables.push({z:x+y+0.5, fn:()=>ctx.drawImage(IMGS.tree, s.x-64, s.y-140, 128,160)});
+    const s=isoToScreen(x,y); drawables.push({z:x+y+0.5, fn:()=>drawSprite(IMGS.tree, s.x-64, s.y-140, 128,160, '#3b7a3b')});
   }
   // nemici
-  enemies.forEach(e=>{ const s=isoToScreen(e.x,e.y); drawables.push({z:e.x+e.y+0.25, fn:()=>ctx.drawImage(IMGS.enemy, s.x-48, s.y-96, 96,128)}); });
+  enemies.forEach(e=>{ const s=isoToScreen(e.x,e.y); drawables.push({z:e.x+e.y+0.25, fn:()=>drawSprite(IMGS.enemy, s.x-48, s.y-96, 96,128, '#8be9fd')}); });
   // player
-  { const s=isoToScreen(player.x,player.y); drawables.push({z:player.x+player.y+0.25, fn:()=>ctx.drawImage(IMGS.player, s.x-48, s.y-96, 96,128)}); }
-  drawables.sort((a,b)=>a.z-b.z); drawables.forEach(d=>d.fn());
+  { const s=isoToScreen(player.x,player.y); drawables.push({z:player.x+player.y+0.25, fn:()=>drawSprite(IMGS.player, s.x-48, s.y-96, 96,128, '#9fb4ff')}); }
+
+  drawables.sort((a,b)=>a.z-b.z);
+  drawables.forEach(d=>d.fn());
+
   // proiettili
-  projectiles.forEach(p=>{ if(p.type==='fireball'){ ctx.drawImage(IMGS.fireball, p.x-24, p.y-24, 48,48); }});
-  // minimappa + debug
+  projectiles.forEach(p=>{ drawSprite(IMGS.fireball, p.x-24, p.y-24, 48,48, '#ff7800'); });
+
   drawMinimap();
-  if(dbg) dbg.textContent = `ISO v2.3 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
+  if(dbg) dbg.textContent = `ISO v2.4 | p:(${player.x},${player.y}) mobs:${enemies.length} path:${pathQueue.length} proj:${projectiles.length}`;
 }
 
 function drawMinimap(){
@@ -405,7 +448,7 @@ function drawMinimap(){
   mmctx.fillStyle='#60a5fa'; mmctx.fillRect(player.x*sx+1,player.y*sy+1,sx-2,sy-2);
 }
 
-// ===== Timers =====
+// ===== Loop =====
 setInterval(()=>{
   const ts=performance.now();
   if(walking && pathQueue.length){
@@ -438,14 +481,9 @@ function respawn(){
   deathScreen.classList.remove('show');
 }
 
-// ===== Bind UI =====
-btnHideMinimap.addEventListener('click', ()=>{ minimapBox.classList.add('collapsed'); saveUI(); });
-btnHideQuest  .addEventListener('click', ()=>{ questPanel.classList.add('collapsed'); saveUI(); });
-btnToggleMinimap.addEventListener('click', ()=>{ minimapBox.classList.toggle('collapsed'); saveUI(); });
-btnToggleQuest  .addEventListener('click', ()=>{ questPanel.classList.toggle('collapsed'); saveUI(); });
+// ===== Bind extra =====
 btnQuestReset.addEventListener('click', ()=>{ questCount=0; questDone=false; updateHUD(); saveGame(); });
 
-// Skill input
 skill1.addEventListener('click', ()=>{
   lastClick = lastClick || {sx:screenW/2, sy:screenH/2};
   tryCastFireball(lastClick.sx, lastClick.sy);
@@ -461,7 +499,12 @@ window.addEventListener('keydown', (e)=>{
 let lastClick=null;
 c.addEventListener('pointerdown', (e)=>{
   const rect=c.getBoundingClientRect();
-  const sx=(e.clientX-rect.left)*(c.width/rect.width), sy=(e.clientY-rect.top)*(c.height/rect.height);
+  const sx=(e.clientX-rect.left)*(c.width/r.width), sy=(e.clientY-rect.top)*(c.height/r.height);
+  // fix: su alcuni browser r non esiste, quindi calcolo r prima
+});
+c.addEventListener('pointerdown', (e)=>{
+  const r=c.getBoundingClientRect();
+  const sx=(e.clientX-r.left)*(c.width/r.width), sy=(e.clientY-r.top)*(c.height/r.height);
   lastClick={sx,sy};
   handleTap(e);
 });
@@ -480,7 +523,7 @@ window.addEventListener('error', (e)=>{
     if(!loaded){ spawnAll(); }
     updateHUD(); draw();
     const b = window.__BOOT_BANNER__;
-    if(b){ b.textContent = 'ready: tutto ok ✓ (menu con onclick)'; }
+    if(b){ b.textContent = 'ready: tutto ok ✓ (iso2.4)'; }
   }catch(err){
     const b = window.__BOOT_BANNER__;
     if(b){ b.textContent = 'ERRORE in init: '+(err && err.message ? err.message : err); b.style.color='#fca5a5'; }
